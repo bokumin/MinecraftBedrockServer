@@ -1,25 +1,16 @@
 #!/bin/bash
 # Minecraft Server Installation Script - James A. Chambers - https://jamesachambers.com
-#
-# Instructions: https://jamesachambers.com/minecraft-bedrock-edition-ubuntu-dedicated-server-guide/
-# Resource Pack Guide: https://jamesachambers.com/minecraft-bedrock-server-resource-pack-guide/
-#
-# To run the setup script use:
-# curl https://raw.githubusercontent.com/TheRemote/MinecraftBedrockServer/master/SetupMinecraft.sh | bash
-#
-# GitHub Repository: https://github.com/TheRemote/MinecraftBedrockServer
+# Modified for OpenSUSE compatibility
 
 echo "Minecraft Bedrock Server installation script by James A. Chambers"
+echo "Modified for OpenSUSE compatibility"
 echo "Latest version always at https://github.com/TheRemote/MinecraftBedrockServer"
 echo "Don't forget to set up port forwarding on your router!  The default port is 19132"
 
 # Randomizer for user agent
 RandNum=$(echo $((1 + $RANDOM % 5000)))
 
-# You can override this for a custom installation directory but I only recommend it if you are using a separate drive for the server
-# It is meant to point to the root folder that holds all servers
-# For example if you had a separate drive mounted at /newdrive you would use DirName='/newdrive' for all servers
-# The servers will be separated by their name/label into folders
+# You can override this for a custom installation directory
 DirName=$(readlink -e ~)
 if [ -z "$DirName" ]; then
   DirName=~
@@ -160,70 +151,36 @@ Fix_Permissions() {
 
 Check_Dependencies() {
   # Install dependencies required to run Minecraft server in the background
-  if command -v apt-get &>/dev/null; then
-    echo "Updating apt.."
-    sudo DEBIAN_FRONTEND=noninteractive apt-get update && sudo DEBIAN_FRONTEND=noninteractive apt-get upgrade -yqq
+  echo "Checking and installing dependencies..."
+  sudo zypper refresh
+  sudo zypper update -y
 
-    echo "Checking and installing dependencies.."
-    if ! command -v curl &>/dev/null; then sudo DEBIAN_FRONTEND=noninteractive apt-get install curl -yqq; fi
-    if ! command -v unzip &>/dev/null; then sudo DEBIAN_FRONTEND=noninteractive apt-get install unzip -yqq; fi
-    if ! command -v screen &>/dev/null; then sudo DEBIAN_FRONTEND=noninteractive apt-get install screen -yqq; fi
-    if ! command -v route &>/dev/null; then sudo DEBIAN_FRONTEND=noninteractive apt-get install net-tools -yqq; fi
-    if ! command -v gawk &>/dev/null; then sudo DEBIAN_FRONTEND=noninteractive apt-get install gawk -yqq; fi
-    if ! command -v openssl &>/dev/null; then sudo DEBIAN_FRONTEND=noninteractive apt-get install openssl -yqq; fi
-    if ! command -v xargs &>/dev/null; then sudo DEBIAN_FRONTEND=noninteractive apt-get install xargs -yqq; fi
-    if ! command -v pigz &>/dev/null; then sudo DEBIAN_FRONTEND=noninteractive apt-get install pigz -yqq; fi
+  # Install required packages
+  sudo zypper install -y curl unzip screen net-tools-deprecated gawk openssl pigz libcurl4 libopenssl1_1
 
-    CurlVer=$(apt-cache show libcurl4 | grep Version | awk 'NR==1{ print $2 }')
-    if [[ "$CurlVer" ]]; then
-      sudo DEBIAN_FRONTEND=noninteractive apt-get install libcurl4 -yqq
-    else
-      # Install libcurl3 for backwards compatibility in case libcurl4 isn't available
-      CurlVer=$(apt-cache show libcurl3 | grep Version | awk 'NR==1{ print $2 }')
-      if [[ "$CurlVer" ]]; then sudo DEBIAN_FRONTEND=noninteractive apt-get install libcurl3 -yqq; fi
-    fi
+  # Check for ARM architecture
+  if [[ $(uname -m) == *"aarch"* || $(uname -m) == *"arm"* ]]; then
+    echo "ARM architecture detected. Installing additional dependencies..."
+    sudo zypper install -y qemu-linux-user qemu-tools binfmt-support
+  fi
 
-    # Install libssl3 dependency as Bedrock server is linking to both
-    CurlVer=$(apt-cache show libssl3 | grep Version | awk 'NR==1{ print $2 }')
-    if [[ "$CurlVer" ]]; then sudo DEBIAN_FRONTEND=noninteractive apt-get install libssl3 -yqq; fi
-
-    sudo DEBIAN_FRONTEND=noninteractive apt-get install libc6 -yqq
-    sudo DEBIAN_FRONTEND=noninteractive apt-get install libcrypt1 -yqq
-
-    # Install libssl 1.1 if available
-    SSLVer=$(apt-cache show libssl1.1 | grep Version | awk 'NR==1{ print $2 }')
-    if [[ "$SSLVer" ]]; then
-      sudo DEBIAN_FRONTEND=noninteractive apt-get install libssl1.1 -yqq
-    else
-      CPUArch=$(uname -m)
-      if [[ "$CPUArch" == *"x86_64"* ]]; then
-        echo "No libssl1.1 available in repositories -- attempting manual install"
-
-        sudo curl -o libssl.deb -k -L https://github.com/TheRemote/Legendary-Bedrock-Container/raw/main/libssl1-1.deb
-        sudo dpkg -i libssl.deb
-        sudo rm libssl.deb
-        SSLVer=$(apt-cache show libssl1.1 | grep Version | awk 'NR==1{ print $2 }')
-        if [[ "$SSLVer" ]]; then
-          echo "Manual libssl1.1 installation successful!"
-        else
-          echo "Manual libssl1.1 installation failed."
-        fi
-      fi
-    fi
-
-    # Double check curl since libcurl dependency issues can sometimes remove it
-    if ! command -v curl &>/dev/null; then sudo DEBIAN_FRONTEND=noninteractive apt-get install curl -yqq; fi
-    echo "Dependency installation completed"
-  else
-    echo "Warning: apt was not found.  You may need to install curl, screen, unzip, libcurl4, openssl, libc6 and libcrypt1 with your package manager for the server to start properly!"
+  # Double check curl installation
+  if ! command -v curl &>/dev/null; then
+    sudo zypper install -y curl
   fi
 }
 
 Update_Server() {
+   CURRENT_DIR=$(pwd)
+
+   # Create the downloads directory if it doesn't exist
+   mkdir -p "$CURRENT_DIR/downloads"
+   
   # Retrieve latest version of Minecraft Bedrock dedicated server
   echo "Checking for the latest version of Minecraft Bedrock server..."
   curl -H "Accept-Encoding: identity" -H "Accept-Language: en" -L -A "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.33 (KHTML, like Gecko) Chrome/90.0.$RandNum.212 Safari/537.33" -o downloads/version.html https://minecraft.net/en-us/download/server/bedrock/
-  DownloadURL=$(grep -o 'https://minecraft.azureedge.net/bin-linux/[^"]*' downloads/version.html)
+  #  DownloadURL=$(grep -o 'https://minecraft.azureedge.net/bin-linux/[^"]*' downloads/version.html)
+  DownloadURL=$(grep -o 'https://www.minecraft.net/bedrockdedicatedserver/bin-linux/[^"]*' downloads/version.html)
   DownloadFile=$(echo "$DownloadURL" | sed 's#.*/##')
   echo "$DownloadURL"
   echo "$DownloadFile"
@@ -236,87 +193,20 @@ Update_Server() {
 }
 
 Check_Architecture() {
-  # Check CPU archtecture to see if we need to do anything special for the platform the server is running on
+  # Check CPU architecture to see if we need to do anything special for the platform the server is running on
   echo "Getting system CPU architecture..."
   CPUArch=$(uname -m)
   echo "System Architecture: $CPUArch"
 
   # Check for ARM architecture
-  if [[ "$CPUArch" == *"aarch"* ]]; then
-    # ARM architecture detected -- download QEMU and dependency libraries
-    echo "aarch64 platform detected -- installing box64..."
-    GetList=$(sudo curl -k -L -o /etc/apt/sources.list.d/box64.list https://ryanfortner.github.io/box64-debs/box64.list)
-    GetKey=$(sudo curl -k -L https://ryanfortner.github.io/box64-debs/KEY.gpg | sudo gpg --dearmor -o /etc/apt/trusted.gpg.d/box64-debs-archive-keyring.gpg)
-    sudo DEBIAN_FRONTEND=noninteractive apt-get update && sudo DEBIAN_FRONTEND=noninteractive apt-get install box64-rpi4arm64 -y
-
-    if [ -n "$(which box64)" ]; then
-      echo "box64 installed successfully"
-    else
-      echo "box64 did not install successfully -- please check the above output to see what went wrong."
-    fi
-
-    # Check if latest available QEMU version is at least 3.0 or higher
-    echo "Installing QEMU..."
-    QEMUVer=$(apt-cache show qemu-user-static | grep Version | awk 'NR==1{ print $2 }' | cut -c3-3)
-    if [[ "$QEMUVer" -lt "3" ]]; then
-      echo "Available QEMU version is not high enough to emulate x86_64.  Please update your QEMU version."
-      exit 1
-    else
-      sudo DEBIAN_FRONTEND=noninteractive apt-get update && sudo DEBIAN_FRONTEND=noninteractive apt-get install qemu-user-static binfmt-support -yqq
-    fi
-
-    if [ -n "$(which qemu-x86_64-static)" ]; then
-      echo "QEMU-x86_64-static installed successfully"
-    else
-      echo "QEMU-x86_64-static did not install successfully -- please check the above output to see what went wrong."
-      exit 1
-    fi
-
-    # Retrieve depends.zip from GitHub repository
-    curl -H "Accept-Encoding: identity" -L -o depends.zip https://raw.githubusercontent.com/TheRemote/MinecraftBedrockServer/master/depends.zip
-    unzip depends.zip
-    sudo mkdir /lib64
-    # Create soft link ld-linux-x86-64.so.2 mapped to ld-2.31.so, ld-2.33.so, ld-2,35.so
-    sudo rm -rf /lib64/ld-linux-x86-64.so.2
-    sudo ln -s $DirName/minecraftbe/$ServerName/ld-2.31.so /lib64/ld-linux-x86-64.so.2
-    sudo ln -s $DirName/minecraftbe/$ServerName/ld-2.33.so /lib64/ld-linux-x86-64.so.2
-    sudo ln -s $DirName/minecraftbe/$ServerName/ld-2.35.so /lib64/ld-linux-x86-64.so.2
-  elif [[ "$CPUArch" == *"arm"* ]]; then
-    # ARM architecture detected -- download QEMU and dependency libraries
-    echo "WARNING: ARM 32 platform detected -- This is not recommended.  64 bit ARM (aarch64) can use Box64 for emulation.  It is recommended to upgrade to a 64 bit OS."
-    echo "Installing dependencies..."
-
-    # Check if latest available QEMU version is at least 3.0 or higher
-    QEMUVer=$(apt-cache show qemu-user-static | grep Version | awk 'NR==1{ print $2 }' | cut -c3-3)
-    if [[ "$QEMUVer" -lt "3" ]]; then
-      echo "Available QEMU version is not high enough to emulate x86_64.  Please update your QEMU version."
-      exit
-    else
-      sudo DEBIAN_FRONTEND=noninteractive apt-get update && sudo DEBIAN_FRONTEND=noninteractive apt-get install qemu-user-static binfmt-support -yqq
-    fi
-
-    if [ -n "$(which qemu-x86_64-static)" ]; then
-      echo "QEMU-x86_64-static installed successfully"
-    else
-      echo "QEMU-x86_64-static did not install successfully -- please check the above output to see what went wrong."
-      exit 1
-    fi
-
-    # Retrieve depends.zip from GitHub repository
-    curl -H "Accept-Encoding: identity" -L -o depends.zip https://raw.githubusercontent.com/TheRemote/MinecraftBedrockServer/master/depends.zip
-    unzip depends.zip
-    sudo mkdir /lib64
-    # Create soft link ld-linux-x86-64.so.2 mapped to ld-2.31.so, ld-2.33.so, ld-2,35.so
-    sudo rm -rf /lib64/ld-linux-x86-64.so.2
-    sudo ln -s $DirName/minecraftbe/$ServerName/ld-2.31.so /lib64/ld-linux-x86-64.so.2
-    sudo ln -s $DirName/minecraftbe/$ServerName/ld-2.33.so /lib64/ld-linux-x86-64.so.2
-    sudo ln -s $DirName/minecraftbe/$ServerName/ld-2.35.so /lib64/ld-linux-x86-64.so.2
+  if [[ "$CPUArch" == *"aarch"* || "$CPUArch" == *"arm"* ]]; then
+    echo "ARM architecture detected. Additional setup may be required."
+    # Add ARM-specific setup steps here if needed
   fi
 
   # Check for x86 (32 bit) architecture
   if [[ "$CPUArch" == *"i386"* || "$CPUArch" == *"i686"* ]]; then
-    # 32 bit attempts have not been successful -- notify user to install 64 bit OS
-    echo "You are running a 32 bit operating system (i386 or i686) and the Bedrock Dedicated Server has only been released for 64 bit (x86_64).  If you have a 64 bit processor please install a 64 bit operating system to run the Bedrock dedicated server!"
+    echo "You are running a 32 bit operating system (i386 or i686) and the Bedrock Dedicated Server has only been released for 64 bit (x86_64). If you have a 64 bit processor, please install a 64 bit operating system to run the Bedrock dedicated server!"
     exit 1
   fi
 }
@@ -330,22 +220,15 @@ Update_Sudoers() {
       AddLine=$(echo "$sudoline" | sudo tee /etc/sudoers.d/minecraftbe)
     fi
   else
-    echo "/etc/sudoers.d was not found on your system.  Please add this line to sudoers using sudo visudo:  $sudoline"
+    echo "/etc/sudoers.d was not found on your system. Please add this line to sudoers using sudo visudo: $sudoline"
   fi
 }
 
-################################################################################################# End Functions
+# Main script execution starts here
 
 # Check to make sure we aren't running as root
 if [[ $(id -u) = 0 ]]; then
   echo "This script is not meant to be run as root. Please run ./SetupMinecraft.sh as a non-root user, without sudo; the script will call sudo when it is needed. Exiting..."
-  exit 1
-fi
-
-if [ -e "SetupMinecraft.sh" ]; then
-  rm -f "SetupMinecraft.sh"
-  echo "Local copy of SetupMinecraft.sh running.  Exiting and running online version..."
-  curl https://raw.githubusercontent.com/TheRemote/MinecraftBedrockServer/master/SetupMinecraft.sh | bash
   exit 1
 fi
 
@@ -379,7 +262,7 @@ read_with_prompt ServerName "Server Label"
 ServerName=$(echo "$ServerName" | tr -cd '[a-zA-Z0-9]._-')
 
 if [[ "$ServerName" == *"minecraftbe"* ]]; then
-  echo "Server label of minecraftbe is not allowed.  Please choose a different server label!"
+  echo "Server label of minecraftbe is not allowed. Please choose a different server label!"
   exit 1
 fi
 
@@ -463,7 +346,7 @@ done
 
 # Force quit if server is still open
 if ! screen -list | grep -q "\.$ServerName\s"; then
-  echo "Minecraft server failed to start after 20 seconds."
+  echo "Minecraft server failed to start after 30 seconds."
 else
   echo "Minecraft server has started.  Type screen -r $ServerName to view the running server!"
 fi
