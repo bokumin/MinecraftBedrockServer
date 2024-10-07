@@ -101,7 +101,7 @@ Update_Scripts() {
 
   # Download update.sh from repository
   echo "Grabbing update.sh from repository..."
-  curl -H "Accept-Encoding: identity" -L -o update.sh https://raw.githubusercontent.com/TheRemote/MinecraftBedrockServer/master/update.sh
+  curl -H "Accept-Encoding: identity" -L -o update.sh https://raw.githubusercontent.com/bokumin/MinecraftBedrockServer/master/update.sh
   chmod +x update.sh
   sed -i "s<pathvariable<$PATH<g" update.sh
 }
