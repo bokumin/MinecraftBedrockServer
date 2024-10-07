@@ -3,7 +3,7 @@
 # Minecraft Bedrock server startup script using screen
 
 # Set path variable
-USERPATH="pathvariable"
+USERPATH="/home/bokucipi/.local/bin:/home/bokucipi/bin:/usr/local/bin:/usr/bin:/bin:/snap/bin"
 PathLength=${#USERPATH}
 if [[ "$PathLength" -gt 12 ]]; then
     PATH="$USERPATH"
@@ -22,13 +22,13 @@ RandNum=$((1 + $RANDOM % 5000))
 
 # Check if server is already started
 ScreenWipe=$(screen -wipe 2>&1)
-if screen -list | grep -q '\.servername\s'; then
-    echo "Server is already started!  Press screen -r servername to open it"
+if screen -list | grep -q '\.bokucipi\s'; then
+    echo "Server is already started!  Press screen -r bokucipi to open it"
     exit 1
 fi
 
 # Change directory to server directory
-cd dirname/minecraftbe/servername
+cd /home/bokucipi/minecraftbe/bokucipi
 
 # Create logs/backups/downloads folder if it doesn't exist
 if [ ! -d "logs" ]; then
@@ -64,23 +64,23 @@ while [ -z "$DefaultRoute" ]; do
 done
 
 # Take ownership of server files and set correct permissions
-Permissions=$(sudo bash dirname/minecraftbe/servername/fixpermissions.sh -a)
+Permissions=$(sudo bash /home/bokucipi/minecraftbe/bokucipi/fixpermissions.sh -a)
 
 # Create backup
 if [ -d "worlds" ]; then
-    echo "Backing up server (to minecraftbe/servername/backups folder)"
+    echo "Backing up server (to minecraftbe/bokucipi/backups folder)"
     if [ -n "$(which pigz)" ]; then
-        echo "Backing up server (multiple cores) to minecraftbe/servername/backups folder"
+        echo "Backing up server (multiple cores) to minecraftbe/bokucipi/backups folder"
         tar -I pigz -pvcf backups/$(date +%Y.%m.%d.%H.%M.%S).tar.gz worlds
     else
-        echo "Backing up server (single cored) to minecraftbe/servername/backups folder"
+        echo "Backing up server (single cored) to minecraftbe/bokucipi/backups folder"
         tar -pzvcf backups/$(date +%Y.%m.%d.%H.%M.%S).tar.gz worlds
     fi
 fi
 
 # Rotate backups -- keep most recent 10
 Rotate=$(
-    pushd dirname/minecraftbe/servername/backups
+    pushd /home/bokucipi/minecraftbe/bokucipi/backups
     ls -1tr | head -n -10 | xargs -d '\n' rm -f --
     popd
 )
@@ -96,7 +96,7 @@ else
     # Download server index.html to check latest version
 
     curl -H "Accept-Encoding: identity" -H "Accept-Language: en" -L -A "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/90.0.$RandNum.212 Safari/537.36" -o downloads/version.html https://www.minecraft.net/en-us/download/server/bedrock
-    LatestURL=$(grep -o 'https://minecraft.azureedge.net/bin-linux/[^"]*' downloads/version.html)
+    LatestURL=$(grep -o 'https://www.minecraft.net/bedrockdedicatedserver/bin-linux/[^"]*' downloads/version.html)
 
     LatestFile=$(echo "$LatestURL" | sed 's#.*/##')
 
@@ -116,7 +116,7 @@ else
     elif [ ! -z "$PinFile" ]; then
         echo "Installing $PinFile"
         DownloadFile=$PinFile
-        DownloadURL="https://minecraft.azureedge.net/bin-linux/$PinFile"
+        DownloadURL="https://www.minecraft.net/bedrockdedicatedserver/bin-linux/$PinFile"
 
         # Download version of Minecraft Bedrock dedicated server if it's not already local
         if [ ! -f "downloads/$DownloadFile" ]; then
@@ -125,12 +125,12 @@ else
 
         # Install version of Minecraft requested
         if [ ! -z "$DownloadFile" ]; then
-            if [ ! -e dirname/minecraftbe/servername/server.properties ]; then
+            if [ ! -e /home/bokucipi/minecraftbe/bokucipi/server.properties ]; then
                 unzip -o "downloads/$DownloadFile" -x "*permissions.json*" "*whitelist.json*" "*valid_known_packs.json*" "*allowlist.json*"
             else
                 unzip -o "downloads/$DownloadFile" -x "*server.properties*" "*permissions.json*" "*whitelist.json*" "*valid_known_packs.json*" "*allowlist.json*"
             fi
-            Permissions=$(chmod u+x dirname/minecraftbe/servername/bedrock_server >/dev/null)
+            Permissions=$(chmod u+x /home/bokucipi/minecraftbe/bokucipi/bedrock_server >/dev/null)
             echo "$DownloadFile" >version_installed.txt
         fi
     elif [[ "$InstalledFile" == "$LatestFile" ]]; then
@@ -147,45 +147,45 @@ else
 
         # Install version of Minecraft requested
         if [ ! -z "$DownloadFile" ]; then
-            if [ ! -e dirname/minecraftbe/servername/server.properties ]; then
+            if [ ! -e /home/bokucipi/minecraftbe/bokucipi/server.properties ]; then
                 unzip -o "downloads/$DownloadFile" -x "*permissions.json*" "*whitelist.json*" "*valid_known_packs.json*" "*allowlist.json*"
             else
                 unzip -o "downloads/$DownloadFile" -x "*server.properties*" "*permissions.json*" "*whitelist.json*" "*valid_known_packs.json*" "*allowlist.json*"
             fi
-            Permissions=$(chmod u+x dirname/minecraftbe/servername/bedrock_server >/dev/null)
+            Permissions=$(chmod u+x /home/bokucipi/minecraftbe/bokucipi/bedrock_server >/dev/null)
             echo "$DownloadFile" >version_installed.txt
         fi
     fi
 fi
 
-if [ ! -e dirname/minecraftbe/servername/allowlist.json ]; then
+if [ ! -e /home/bokucipi/minecraftbe/bokucipi/allowlist.json ]; then
     echo "Creating default allowlist.json..."
-    echo '[]' >dirname/minecraftbe/servername/allowlist.json
+    echo '[]' >/home/bokucipi/minecraftbe/bokucipi/allowlist.json
 fi
-if [ ! -e dirname/minecraftbe/servername/permissions.json ]; then
+if [ ! -e /home/bokucipi/minecraftbe/bokucipi/permissions.json ]; then
     echo "Creating default permissions.json..."
-    echo '[]' >dirname/minecraftbe/servername/permissions.json
+    echo '[]' >/home/bokucipi/minecraftbe/bokucipi/permissions.json
 fi
-ContentLogging=$(grep "content-log-file-enabled" dirname/minecraftbe/servername/server.properties)
+ContentLogging=$(grep "content-log-file-enabled" /home/bokucipi/minecraftbe/bokucipi/server.properties)
 if [ -z "$ContentLogging" ]; then
-    echo "" >> dirname/minecraftbe/servername/server.properties
-    echo "content-log-file-enabled=true" >> dirname/minecraftbe/servername/server.properties
-    echo "# Enables logging content errors to a file" >> dirname/minecraftbe/servername/server.properties
+    echo "" >> /home/bokucipi/minecraftbe/bokucipi/server.properties
+    echo "content-log-file-enabled=true" >> /home/bokucipi/minecraftbe/bokucipi/server.properties
+    echo "# Enables logging content errors to a file" >> /home/bokucipi/minecraftbe/bokucipi/server.properties
 fi
 
-echo "Starting Minecraft server.  To view window type screen -r servername"
+echo "Starting Minecraft server.  To view window type screen -r bokucipi"
 echo "To minimize the window and let the server run in the background, press Ctrl+A then Ctrl+D"
 
 CPUArch=$(uname -m)
 if [[ "$CPUArch" == *"aarch64"* ]]; then
-    cd dirname/minecraftbe/servername
+    cd /home/bokucipi/minecraftbe/bokucipi
     if [ -n "$(which box64)" ]; then
         BASH_CMD="box64 bedrock_server"
     else
-        BASH_CMD="LD_LIBRARY_PATH=dirname/minecraftbe/servername dirname/minecraftbe/servername/bedrock_server"
+        BASH_CMD="LD_LIBRARY_PATH=/home/bokucipi/minecraftbe/bokucipi /home/bokucipi/minecraftbe/bokucipi/bedrock_server"
     fi
 else
-    BASH_CMD="LD_LIBRARY_PATH=dirname/minecraftbe/servername dirname/minecraftbe/servername/bedrock_server"
+    BASH_CMD="LD_LIBRARY_PATH=/home/bokucipi/minecraftbe/bokucipi /home/bokucipi/minecraftbe/bokucipi/bedrock_server"
 fi
 
 if command -v gawk &>/dev/null; then
@@ -193,4 +193,4 @@ if command -v gawk &>/dev/null; then
 else
     echo "gawk application was not found -- timestamps will not be available in the logs.  Please delete SetupMinecraft.sh and run the script the new recommended way!"
 fi
-screen -L -Logfile logs/servername.$(date +%Y.%m.%d.%H.%M.%S).log -dmS servername /bin/bash -c "${BASH_CMD}"
+screen -L -Logfile logs/bokucipi.$(date +%Y.%m.%d.%H.%M.%S).log -dmS bokucipi /bin/bash -c "${BASH_CMD}"
